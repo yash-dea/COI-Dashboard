@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>COI Mathematical Engine</title>
+    
+    <script>
+      MathJax = {
+        tex: {
+          inlineMath: [['$', '$'], ['\\(', '\\)']],
+          displayMath: [['$$', '$$'], ['\\[', '\\]']]
+        }
+      };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background-color: #f9fafb;
+        }
+        h1, h2, h3 {
+            color: #111827;
+        }
+        h1 {
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 10px;
+        }
+        h2 {
+            margin-top: 40px;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 5px;
+            color: #1f2937;
+        }
+        h3 {
+            margin-top: 25px;
+            color: #374151;
+        }
+        .math-block {
+            background-color: #ffffff;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+        p {
+            margin-bottom: 1.2em;
+        }
+        em {
+            color: #4b5563;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Cost of Inaction (COI) Mathematical Engine</h1>
+    <p>This document outlines the core mathematical models, assumptions, and guardrails used in the Cost of Inaction (COI) simulation engine. The model is designed to project realistic career trajectories while emphasizing the financial opportunity cost of remaining in a stagnant career path ("FOMO").</p>
+
+    <h2>1. The Baseline: Current Path (Status Quo)</h2>
+    <p>The baseline represents the user's actual career history and the projection of that exact trajectory into the future without strategic job hopping.</p>
+
+    <h3>Past Baseline (Actuals)</h3>
+    <p>The user's past salaries are calculated using a step-function to simulate periodic appraisals based on the months spent in each role ($m$) and the appraisal frequency in years ($f$).</p>
+    
+    <p>The number of appraisals received in a specific role is:</p>
+    <div class="math-block">
+        $$n_{\text{appraisals}} = \lfloor \frac{m}{f \times 12} \rfloor$$
+    </div>
+
+    <p>The compensation at any given month during that role is calculated as:</p>
+    <div class="math-block">
+        $$S_m = S_{\text{start}} \times (1 + r_{\text{appraisal}})^{n_{\text{appraisals}}}$$
+    </div>
+    <p><em>(Note: Career gaps or periods between roles are linearly interpolated to maintain a continuous timeline).</em></p>
+
+    <h3>Future Baseline (Status Quo)</h3>
+    <p>For future projections, the baseline assumes standard annual raises (appraisals) without job hops. The salary increases exactly once every 12 months:</p>
+    <div class="math-block">
+        $$S_{y} = S_{y-1} \times (1 + r_{\text{safe}})$$
+    </div>
+
+    <h2>2. The "What If": Past Potential</h2>
+    <p>This trajectory simulates what the user <em>could</em> have earned if they had engaged in strategic job hopping from the beginning of their career.</p>
+
+    <h3>Initial Breakaway</h3>
+    <p>To ground the chart in reality, the simulation strictly follows the user's actual baseline for the first $h$ years, where $h$ is the user-defined <code>hop_cadence</code>.</p>
+    <p>At exactly month $M_{\text{first\_hop}} = h \times 12$, the breakaway jump occurs:</p>
+    <div class="math-block">
+        $$S_{\text{hop}} = S_{\text{actual}} \times (1 + r_{\text{hop}})$$
+    </div>
+
+    <h3>Compounding & The FOMO Guardrail</h3>
+    <p>After the first hop, the past potential path grows via standard appraisals in non-hop years and hop increments in hop years.</p>
+    <p>To guarantee the sales narrative (showing wealth lost), a strict mathematical guardrail forces the past potential to always outpace the user's actual history by a significant margin. At any given month $t$, the past potential salary ($S_t$) is calculated as:</p>
+    <div class="math-block">
+        $$S_t = \max\left( S_{t\_\text{calculated}},\; S_{\text{actual}} \times (1.15 + r_{\text{hop}}) \right)$$
+    </div>
+
+    <h2>3. The "What's Next": Future Projections</h2>
+    <p>Future paths (Current Field Hopping and Data Career Switch) start exactly at "TODAY" as independent offsets. Both paths are subject to advanced realistic constraints: <strong>Temporal Decay</strong> and <strong>Soft Saturation</strong>.</p>
+
+    <h3>A. Growth Constraints</h3>
+    <p><strong>1. Temporal Decay</strong></p>
+    <p>Salary growth naturally slows down as professionals advance in their careers. If the years passed since the simulation start ($y$) exceeds the user-defined decay threshold ($y_{\text{decay}}$), the expected raise ($r_{\text{base}}$) is reduced by a decay rate ($d$):</p>
+    <div class="math-block">
+        $$r_{\text{adjusted}} = r_{\text{base}} \times (1 - d)^{(y - y_{\text{decay}})}$$
+    </div>
+
+    <p><strong>2. Soft Saturation (The Cubic Floor)</strong></p>
+    <p>To prevent salaries from growing to infinity, the engine applies a cubic drop-off as the salary ($S$) approaches the market ceiling ($S_{\text{ceiling}}$). A floor of 0.4 (40%) ensures the salary never completely flatlines, keeping the trajectory aspirational but mathematically bounded:</p>
+    <div class="math-block">
+        $$C_{\text{sat}} = \max\left(0.4, 1.0 - \left(\frac{S}{S_{\text{ceiling}}}\right)^3\right)$$
+    </div>
+
+    <p>The final applied raise for any given period is:</p>
+    <div class="math-block">
+        $$r_{\text{final}} = r_{\text{adjusted}} \times C_{\text{sat}}$$
+    </div>
+
+    <h3>B. Current Field Future Hopping</h3>
+    <p>Starts today with an immediate hop from the current salary:</p>
+    <div class="math-block">
+        $$S_{\text{start}} = S_{\text{current}} \times (1 + r_{\text{hop}})$$
+    </div>
+    <p>From there, it grows using the constrained $r_{\text{final}}$ formula, with the ceiling defined as the user's <code>current_salary</code> multiplied by the <code>current_field_ceiling_multiplier</code>.</p>
+
+    <h3>C. Target Data Role Switch</h3>
+    <p>The starting salary for the Data Career switch is anchored to both the user's current earning power and live market data (Adzuna). It takes the maximum of either a 20% hike on their current salary or 20% above the Adzuna market minimum ($M_{\text{min}}$):</p>
+    <div class="math-block">
+        $$S_{\text{data\_start}} = \max(S_{\text{current}} \times 1.20,\; M_{\text{min}} \times 1.20)$$
+    </div>
+    <p>It then grows using the constrained $r_{\text{final}}$ formula, using the Adzuna Market Maximum as its absolute $S_{\text{ceiling}}$.</p>
+
+    <h2>4. The FOMO Metrics (Dashboard KPIs)</h2>
+    <p>The core dashboard metrics display the cumulative area under the curve (total earnings over time). Since the engine calculates data on a monthly basis, the arrays are summed and divided by 12 to yield annualized figures.</p>
+
+    <p><strong>1. Wealth Lost To Date</strong></p>
+    <p>Calculates the historical money left on the table by not job-hopping.</p>
+    <div class="math-block">
+        $$\text{Lost} = \sum_{t=0}^{\text{Today}} \frac{S_{\text{hop\_past}}(t)}{12} - \sum_{t=0}^{\text{Today}} \frac{S_{\text{actual}}(t)}{12}$$
+    </div>
+
+    <p><strong>2. Future Gain (Hopping in Current Field)</strong></p>
+    <div class="math-block">
+        $$\text{Gain}_{\text{current}} = \sum_{t=\text{Today}}^{\text{End}} \frac{S_{\text{hop\_future}}(t)}{12} - \sum_{t=\text{Today}}^{\text{End}} \frac{S_{\text{actual\_future}}(t)}{12}$$
+    </div>
+
+    <p><strong>3. Future Gain (Data Role Switch)</strong></p>
+    <div class="math-block">
+        $$\text{Gain}_{\text{data}} = \sum_{t=\text{Today}}^{\text{End}} \frac{S_{\text{data\_future}}(t)}{12} - \sum_{t=\text{Today}}^{\text{End}} \frac{S_{\text{actual\_future}}(t)}{12}$$
+    </div>
+
+</body>
+</html>
